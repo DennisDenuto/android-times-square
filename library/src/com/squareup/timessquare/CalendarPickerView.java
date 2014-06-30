@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
+import android.view.ActionMode;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -40,7 +41,9 @@ import static java.util.Calendar.YEAR;
  * {@link #getSelectedDate()}.
  */
 public class CalendarPickerView extends ListView {
-  public enum SelectionMode {
+    private ActionMode mActionMode;
+
+    public enum SelectionMode {
     /**
      * Only one date will be selectable.  If there is already a selected date and you select a new
      * one, the old date will be unselected.
@@ -83,6 +86,7 @@ public class CalendarPickerView extends ListView {
   private int titleTextColor;
   private int headerTextColor;
 
+  private ActionMode.Callback calendarRowActionModeCallback;
   private OnDateSelectedListener dateListener;
   private DateSelectableFilter dateConfiguredListener;
   private OnInvalidDateSelectedListener invalidDateListener =
@@ -410,6 +414,10 @@ public class CalendarPickerView extends ListView {
 
   private class CellClickedListener implements MonthView.Listener {
     @Override public void handleClick(MonthCellDescriptor cell) {
+        if (mActionMode != null) {
+            mActionMode.finish();
+            mActionMode = null;
+        }
       Date clickedDate = cell.getDate();
 
       if (!betweenDates(clickedDate, minCal, maxCal) || !isDateSelectable(clickedDate)) {
@@ -417,7 +425,7 @@ public class CalendarPickerView extends ListView {
           invalidDateListener.onInvalidDateSelected(clickedDate);
         }
       } else {
-        boolean wasSelected = doSelectDate(clickedDate, cell);
+        boolean wasSelected = doSelectDate(clickedDate, cell, CalendarPickerView.this.selectionMode);
 
         if (dateListener != null) {
           if (wasSelected) {
@@ -428,6 +436,19 @@ public class CalendarPickerView extends ListView {
         }
       }
     }
+
+      @Override
+      public void handleLongClick(MonthCellDescriptor cell) {
+          Date clickedDate = cell.getDate();
+          boolean wasSelected = doSelectDate(clickedDate, cell, SelectionMode.SINGLE);
+          if (wasSelected) {
+              dateListener.onDateSelected(clickedDate);
+          } else {
+              dateListener.onDateUnselected(clickedDate);
+          }
+
+          mActionMode = startActionMode(calendarRowActionModeCallback);
+      }
   }
 
   /**
@@ -463,7 +484,7 @@ public class CalendarPickerView extends ListView {
     if (monthCellWithMonthIndex == null || !isDateSelectable(date)) {
       return false;
     }
-    boolean wasSelected = doSelectDate(date, monthCellWithMonthIndex.cell);
+    boolean wasSelected = doSelectDate(date, monthCellWithMonthIndex.cell, selectionMode);
     if (wasSelected) {
       scrollToSelectedMonth(monthCellWithMonthIndex.monthIndex, smoothScroll);
     }
@@ -485,7 +506,7 @@ public class CalendarPickerView extends ListView {
     }
   }
 
-  private boolean doSelectDate(Date date, MonthCellDescriptor cell) {
+  private boolean doSelectDate(Date date, MonthCellDescriptor cell, SelectionMode selectionMode) {
     Calendar newlySelectedCal = Calendar.getInstance(locale);
     newlySelectedCal.setTime(date);
     // Sanitize input: clear out the hours/minutes/seconds/millis.
@@ -665,6 +686,7 @@ public class CalendarPickerView extends ListView {
             MonthView.create(parent, inflater, weekdayNameFormat, listener, today, dividerColor,
                 dayBackgroundResId, dayTextColorResId, titleTextColor, headerTextColor);
       }
+      monthView.setLongClickable(true);
       monthView.init(months.get(position), cells.get(position), displayOnly);
       return monthView;
     }
@@ -773,6 +795,11 @@ public class CalendarPickerView extends ListView {
   public void setOnDateSelectedListener(OnDateSelectedListener listener) {
     dateListener = listener;
   }
+
+
+    public void setCalendarRowActionModeCallback(ActionMode.Callback calendarRowActionModeCallback) {
+        this.calendarRowActionModeCallback = calendarRowActionModeCallback;
+    }
 
   /**
    * Set a listener to react to user selection of a disabled date.
