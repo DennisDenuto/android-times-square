@@ -22,7 +22,7 @@
     </dependency>
 
     <dependency>
-      <groupId>com.squareup</groupId>
+      <groupId>au.com.cyanoradical</groupId>
       <artifactId>android-times-square</artifactId>
       <version>${project.version}</version>
       <type>aar</type>
